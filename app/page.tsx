@@ -49,6 +49,9 @@ export default function Welcome() {
               Connect it
             </button>
           </p>
+          <p className="tiny" style={{ textAlign: "center" }}>
+            By continuing you agree to the <Link href="/terms">Terms of Service</Link> and <Link href="/privacy">Privacy Policy</Link>.
+          </p>
         </div>
       </main>
     </>

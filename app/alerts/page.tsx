@@ -12,6 +12,8 @@ import { REPS } from "../../lib/rep";
 export default function Alerts() {
   const signedIn = useRequireSignIn();
   const { prefs, updatePrefs, api, markets, agent, endSession, logout } = useSaqbot();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [limit, setLimit] = useState<string>(prefs.dailyLossLimit?.toString() ?? "");
   const me = useQuery({
@@ -46,6 +48,25 @@ export default function Alerts() {
       window.open(url, "_blank", "noopener");
     } catch (e) {
       setMsg({ kind: "error", text: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  async function deleteData() {
+    setDeleting(true);
+    setMsg(null);
+    try {
+      await unsubscribePush().catch(() => {});
+      await api("/api/me", { method: "DELETE" });
+      endSession();
+      try {
+        for (const k of Object.keys(localStorage)) if (k.startsWith("saqbot.")) localStorage.removeItem(k);
+      } catch {
+        // storage blocked: nothing to clear
+      }
+      await logout();
+    } catch (e) {
+      setMsg({ kind: "error", text: e instanceof Error ? e.message : String(e) });
+      setDeleting(false);
     }
   }
 
@@ -113,6 +134,25 @@ export default function Alerts() {
           <Link className="btn btn-quiet btn-sm" href="/rep">Change my rep ({prefs.rep ? REPS[prefs.rep].rank : "not set"})</Link>
           {agent && <button className="btn btn-quiet btn-sm" onClick={endSession}>End trading session on this device</button>}
           <button className="btn btn-quiet btn-sm" onClick={() => logout()}>Sign out</button>
+          {confirmDelete ? (
+            <div className="notice notice-error stack">
+              <span>
+                This permanently deletes your SaqBot account record, wallet address, alert settings, Telegram link and notification subscriptions,
+                and clears SaqBot from this device. Your funds stay in your wallet. To also delete your login and embedded wallet, email
+                hello@saqbot.xyz after withdrawing.
+              </span>
+              <div className="grid2">
+                <button className="btn btn-quiet btn-sm" disabled={deleting} onClick={() => setConfirmDelete(false)}>Keep my data</button>
+                <button className="btn btn-danger btn-sm" disabled={deleting} onClick={deleteData}>{deleting ? "Deleting…" : "Delete for good"}</button>
+              </div>
+            </div>
+          ) : (
+            <button className="btn btn-text btn-sm" style={{ color: "var(--down)" }} onClick={() => setConfirmDelete(true)}>Delete my SaqBot data</button>
+          )}
+          <nav className="footer-links" aria-label="Legal">
+            <Link href="/privacy">Privacy Policy</Link>
+            <Link href="/terms">Terms of Service</Link>
+          </nav>
         </section>
       </main>
       <TabBar />

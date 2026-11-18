@@ -14,6 +14,20 @@ export async function GET(req: Request) {
   }
 }
 
+/**
+ * Deletes everything SaqBot stores about this user. Telegram link codes and push
+ * subscriptions are removed by the database's "on delete cascade".
+ */
+export async function DELETE(req: Request) {
+  try {
+    const id = await requireUser(req);
+    await sql`delete from users where id = ${id}`;
+    return Response.json({ ok: true });
+  } catch (e) {
+    return errorResponse(e);
+  }
+}
+
 /** Saves rep, alert settings and trading wallet so the alert worker knows what to watch. */
 export async function PUT(req: Request) {
   try {
