@@ -6,7 +6,6 @@
 const PUBLIC_ENV: Record<string, string | undefined> = {
   NEXT_PUBLIC_HL_TESTNET: process.env.NEXT_PUBLIC_HL_TESTNET,
   NEXT_PUBLIC_BUILDER_ADDRESS: process.env.NEXT_PUBLIC_BUILDER_ADDRESS,
-  NEXT_PUBLIC_BUILDER_FEE_TENTHS_BP: process.env.NEXT_PUBLIC_BUILDER_FEE_TENTHS_BP,
   NEXT_PUBLIC_BAWSAQ_TOKEN: process.env.NEXT_PUBLIC_BAWSAQ_TOKEN,
   NEXT_PUBLIC_BAWSAQ_MIN_HOLD: process.env.NEXT_PUBLIC_BAWSAQ_MIN_HOLD,
   NEXT_PUBLIC_ROBINHOOD_RPC: process.env.NEXT_PUBLIC_ROBINHOOD_RPC,
@@ -23,9 +22,12 @@ export const BUILDER_ADDRESS = isAddr(env("NEXT_PUBLIC_BUILDER_ADDRESS"))
   ? (env("NEXT_PUBLIC_BUILDER_ADDRESS").toLowerCase() as `0x${string}`)
   : null;
 
-/** Standard builder fee in tenths of a basis point. 50 = 0.05%. Hyperliquid caps perps at 100. */
-export const BUILDER_FEE = Math.min(100, Math.max(0, Number(env("NEXT_PUBLIC_BUILDER_FEE_TENTHS_BP", "50"))));
+/** SaqBot fee for non-holders, in tenths of a basis point: 50 = 0.05% of each trade's value. Hyperliquid caps perps at 100. */
+export const BUILDER_FEE = 50;
 export const BUILDER_FEE_PERCENT = `${(BUILDER_FEE / 1000).toFixed(3)}%`;
+/** Fee as shown to people, e.g. "0.05%". */
+export const feeLabel = (tenthsBp: number) => `${Number((tenthsBp / 1000).toFixed(3))}%`;
+export const BUILDER_FEE_LABEL = feeLabel(BUILDER_FEE);
 
 /** BAWSAQ holder discount: holders of at least this many tokens pay no SaqBot fee. */
 export const BAWSAQ_TOKEN = env("NEXT_PUBLIC_BAWSAQ_TOKEN", "0x756A626544D90585fF9E5E6edEF5406a69b45C9c") as `0x${string}`;

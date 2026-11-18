@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useSaqbot } from "../lib/client/saqbot";
 import { REPS } from "../lib/rep";
 
@@ -16,9 +16,32 @@ export function Band({ title, back, right }: { title: string; back?: string; rig
           </svg>
         </Link>
       )}
-      <span className="display title">{title}</span>
+      {title === "SaqBot" ? <Brand /> : <span className="display title">{title}</span>}
       {right}
     </header>
+  );
+}
+
+/** SaqBot wordmark with the neon logo, used in the header band. */
+export function Brand() {
+  return (
+    <span className="brand">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/logo.png" alt="" />
+      <span className="display title">SaqBot</span>
+    </span>
+  );
+}
+
+/** Red "WASTED" stamp shown when a practice job gets liquidated. Tap to dismiss. */
+export function Wasted({ events }: { events: { id: string; reason: string }[] }) {
+  const ids = events.filter((e) => e.reason === "liquidated").map((e) => e.id).join(",");
+  const [dismissed, setDismissed] = useState("");
+  if (!ids || dismissed === ids) return null;
+  return (
+    <div className="wasted-backdrop" role="alertdialog" aria-label="Wasted: your practice job was liquidated" onClick={() => setDismissed(ids)}>
+      <span className="wasted-stamp">WASTED</span>
+    </div>
   );
 }
 
@@ -108,7 +131,7 @@ export function ModeSwitch() {
           role="radio"
           aria-checked={prefs.mode === m}
           onClick={() => updatePrefs({ mode: m })}
-          style={{ minHeight: 40, padding: "0 14px", border: 0, cursor: "pointer", fontWeight: 600, background: prefs.mode === m ? "var(--ink)" : "transparent", color: prefs.mode === m ? "var(--page)" : "var(--ink)" }}
+          style={{ minHeight: 40, padding: "0 14px", border: 0, cursor: "pointer", fontWeight: 600, background: prefs.mode === m ? "var(--neon)" : "transparent", color: prefs.mode === m ? "var(--on-neon)" : "var(--ink)" }}
         >
           {m === "live" ? "Live" : "Practice"}
         </button>

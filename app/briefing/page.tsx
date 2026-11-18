@@ -25,18 +25,17 @@ export default function Briefing() {
       <Band title="The Briefing" back="/rep" />
       <main className="screen" style={{ gap: 14 }}>
         <div className="stack">
-          <p className="small down" style={{ fontWeight: 600 }}>Required reading for new crew</p>
           <h1 className="display" style={{ fontSize: 40 }}>Eight things to know before your first job.</h1>
           <p className="lead">Two minutes now can save your whole stash later. Each one comes with the real trading term so you'll recognize it anywhere.</p>
         </div>
         <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 10 }}>
           {ITEMS.map(([term, title, body], i) => (
             <li key={term} className="panel" style={{ flexDirection: "row", alignItems: "flex-start", gap: 14 }}>
-              <span className="display" aria-hidden="true" style={{ flex: "none", width: 36, height: 36, borderRadius: "50%", background: "var(--ink)", color: "var(--page)", display: "grid", placeItems: "center", fontSize: 20 }}>
+              <span className="display" aria-hidden="true" style={{ flex: "none", width: 36, height: 36, borderRadius: "50%", background: "var(--neon)", color: "var(--on-neon)", display: "grid", placeItems: "center", fontSize: 20 }}>
                 {i + 1}
               </span>
               <div className="stack" style={{ gap: 4 }}>
-                <span className="tiny" style={{ fontWeight: 600, color: "#4f6b2e" }}>{term}</span>
+                <span className="tiny" style={{ fontWeight: 600, color: "var(--sage)" }}>{term}</span>
                 <h2 className="display" style={{ fontSize: 24 }}>{title}</h2>
                 <p style={{ margin: 0, fontSize: 15, color: "var(--ink-2)" }}>{body}</p>
               </div>

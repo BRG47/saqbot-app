@@ -24,8 +24,9 @@ export function Providers({ children }: { children: ReactNode }) {
       appId={PRIVY_APP_ID}
       config={{
         loginMethods: ["google", "email", "wallet"],
-        appearance: { theme: "light", accentColor: "#24361a", logo: "/icon-192.png" },
+        appearance: { theme: "dark", accentColor: "#39ff14", logo: "/logo.png" },
         embeddedWallets: { ethereum: { createOnLogin: "users-without-wallets" } },
+        fundingMethodConfig: { moonpay: { useSandbox: IS_TESTNET } },
         defaultChain: chain,
         supportedChains: [chain],
       }}

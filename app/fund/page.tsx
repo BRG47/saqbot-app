@@ -8,7 +8,7 @@ import { useState } from "react";
 import { createPublicClient, erc20Abi, formatUnits, http } from "viem";
 import { Band, useRequireSignIn, usd } from "../../components/ui";
 import { useSaqbot } from "../../lib/client/saqbot";
-import { ARB_USDC, BAWSAQ_MIN_HOLD, BUILDER_FEE_PERCENT, IS_TESTNET, MIN_DEPOSIT_USDC } from "../../lib/config";
+import { ARB_USDC, BAWSAQ_MIN_HOLD, BUILDER_FEE_LABEL, IS_TESTNET, MIN_DEPOSIT_USDC } from "../../lib/config";
 import { depositChain, depositToHyperliquid } from "../../lib/deposit";
 import { transport } from "../../lib/hyperliquid";
 
@@ -71,13 +71,28 @@ export default function Fund() {
           <h2 className="display h2">1. Get USDC</h2>
           <button
             className="btn"
-            disabled={busy !== null}
+            disabled={busy !== null || IS_TESTNET}
             onClick={() =>
-              run("card", () => fundWallet({ address, options: { chain: depositChain, asset: "USDC", amount: "50" } }), "Payment started. Your USDC shows up here in a few minutes.")
+              run(
+                "card",
+                async () => {
+                  const res = await fundWallet({
+                    address,
+                    options: { chain: depositChain, asset: "USDC", amount: "50", defaultFundingMethod: "card", card: { preferredProvider: "coinbase" } },
+                  });
+                  if (res.status === "cancelled") throw new Error("You cancelled the request. Nothing was sent.");
+                },
+                "Payment done. Your USDC shows up here in a few minutes.",
+              )
             }
           >
-            Buy USDC with Apple Pay or card
+            {busy === "card" ? "Opening checkout…" : "Buy USDC with Apple Pay or card"}
           </button>
+          <p className="tiny" style={{ marginTop: -4 }}>
+            {IS_TESTNET
+              ? "Card and Apple Pay purchases switch on with real-money trading. On testnet, use test USDC from Hyperliquid's faucet."
+              : "Apple Pay shows up in Safari on iPhone and Mac. Card checkout is run by Coinbase or MoonPay; they may ask for ID the first time."}
+          </p>
           <div className="panel" style={{ gap: 8 }}>
             <strong>Or send from an exchange</strong>
             <p className="small">Withdraw <b>USDC</b> on the <b>Arbitrum One</b> network to this address. Other tokens or networks can be lost.</p>
@@ -114,7 +129,7 @@ export default function Fund() {
           <p className="small">
             {fee?.holder
               ? "You hold enough BAWSAQ to trade with 0% SaqBot fees."
-              : `SaqBot charges ${BUILDER_FEE_PERCENT} of each trade's value. Hold ${BAWSAQ_MIN_HOLD.toLocaleString("en-US")} BAWSAQ for 0%.`}{" "}
+              : `SaqBot charges ${BUILDER_FEE_LABEL} of each trade's value. Hold ${BAWSAQ_MIN_HOLD.toLocaleString("en-US")} BAWSAQ for 0%.`}{" "}
             The session creates a trade-only key on this phone. It can place and close trades but can never withdraw.
           </p>
           {!fee?.holder && (

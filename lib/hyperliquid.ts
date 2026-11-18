@@ -124,3 +124,18 @@ export function formatSize(size: number, szDecimals: number): string {
 function trimZeros(s: string): string {
   return s.includes(".") ? s.replace(/\.?0+$/, "") : s;
 }
+
+export type CandleRange = "1H" | "1D" | "1W";
+const CANDLE_SETTINGS = {
+  "1H": { interval: "1m", ms: 3_600_000 },
+  "1D": { interval: "15m", ms: 86_400_000 },
+  "1W": { interval: "2h", ms: 7 * 86_400_000 },
+} as const;
+
+/** Closing prices for a price chart, oldest first. */
+export async function getCandles(coin: string, range: CandleRange): Promise<{ t: number; c: number }[]> {
+  const { interval, ms } = CANDLE_SETTINGS[range];
+  const now = Date.now();
+  const candles = await info.candleSnapshot({ coin, interval, startTime: now - ms, endTime: now });
+  return candles.map((k) => ({ t: k.t, c: Number(k.c) })).filter((k) => k.c > 0);
+}

@@ -1,6 +1,6 @@
 # SaqBot
 
-The 5-Star Cheat Code, every single trade. A phone-first web app (installable PWA) for planning
+Profit is the TARGET. Just don't get WASTED. A phone-first web app (installable PWA) for planning
 Hyperliquid perps trades like a heist, plus a Telegram bot and alert worker.
 
 ## What's in here
@@ -19,7 +19,7 @@ Plan the job (with full send), Active jobs, Practice run, Alerts and intel.
 - **Sign-in and wallets:** Privy creates a wallet for each user (Google or email). Existing wallets can connect too.
 - **Funding:** Privy's on-ramp buys USDC on Arbitrum, or users send USDC from an exchange. "Move to my stash" sends it to Hyperliquid's bridge. Deposits under 5 USDC are lost by the bridge, so the app refuses anything under 6.
 - **Trading:** "Start trading session" approves the SaqBot builder fee (skipped for BAWSAQ holders) and a trade-only agent key that is stored on the phone. It can trade but never withdraw. SaqBot's servers never hold keys or funds.
-- **Fees:** non-holders pay `NEXT_PUBLIC_BUILDER_FEE_TENTHS_BP` (default 0.05%). Wallets holding 1M+ BAWSAQ on Robinhood Chain, including wallets linked in Privy, pay 0%.
+- **Fees:** non-holders pay a 0.05% SaqBot fee (`BUILDER_FEE` in `lib/config.ts`). Wallets holding 1M+ BAWSAQ on Robinhood Chain, including wallets linked in Privy, pay 0%.
 - **Practice runs:** fake $1,000 on live prices, stored on the device. Works without signing in.
 
 ## Setup

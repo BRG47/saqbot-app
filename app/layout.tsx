@@ -11,15 +11,16 @@ export const metadata: Metadata = {
   title: "SaqBot: The 5-Star Cheat Code",
   description: "Plan every perps trade like a heist. Practice runs, getaway routes and 5-star event alerts.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "SaqBot", statusBarStyle: "default" },
-  icons: { icon: "/icon-192.png", apple: "/icon-192.png" },
+  appleWebApp: { capable: true, title: "SaqBot", statusBarStyle: "black" },
+  icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#8fa66e",
+  themeColor: "#121a0f",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
