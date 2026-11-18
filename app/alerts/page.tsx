@@ -7,6 +7,7 @@ import { EventList } from "../../components/EventList";
 import { Band, TabBar, ToggleRow, useRequireSignIn } from "../../components/ui";
 import { subscribePush, unsubscribePush } from "../../lib/client/push";
 import { useSaqbot } from "../../lib/client/saqbot";
+import { CONTACT_EMAIL } from "../../lib/config";
 import { REPS } from "../../lib/rep";
 
 export default function Alerts() {
@@ -139,7 +140,7 @@ export default function Alerts() {
               <span>
                 This permanently deletes your SaqBot account record, wallet address, alert settings, Telegram link and notification subscriptions,
                 and clears SaqBot from this device. Your funds stay in your wallet. To also delete your login and embedded wallet, email
-                hello@saqbot.xyz after withdrawing.
+                {CONTACT_EMAIL} after withdrawing.
               </span>
               <div className="grid2">
                 <button className="btn btn-quiet btn-sm" disabled={deleting} onClick={() => setConfirmDelete(false)}>Keep my data</button>

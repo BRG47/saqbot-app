@@ -35,6 +35,9 @@ export const BAWSAQ_MIN_HOLD = Number(env("NEXT_PUBLIC_BAWSAQ_MIN_HOLD", "100000
 export const ROBINHOOD_RPC = env("NEXT_PUBLIC_ROBINHOOD_RPC", "https://rpc.mainnet.chain.robinhood.com");
 export const ROBINHOOD_CHAIN_ID = 4663;
 
+/** Where users, Google and data requests should write. */
+export const CONTACT_EMAIL = "bawsaqonrh@gmail.com";
+
 export const PRIVY_APP_ID = env("NEXT_PUBLIC_PRIVY_APP_ID");
 export const TELEGRAM_BOT_USERNAME = env("NEXT_PUBLIC_TELEGRAM_BOT_USERNAME", "TradeSaqBot");
 export const VAPID_PUBLIC_KEY = env("NEXT_PUBLIC_VAPID_PUBLIC_KEY");

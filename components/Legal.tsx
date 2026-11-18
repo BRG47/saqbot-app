@@ -1,9 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { CONTACT_EMAIL } from "../lib/config";
 import { Band } from "./ui";
 
+export { CONTACT_EMAIL };
+
 export const LEGAL_UPDATED = "November 18, 2026";
-export const CONTACT_EMAIL = "hello@saqbot.xyz";
 
 /** Shared layout for the Privacy Policy and Terms of Service. Plain server-rendered HTML: no scripts, CSP-safe. */
 export function LegalPage({ title, intro, children }: { title: string; intro: ReactNode; children: ReactNode }) {

@@ -1,4 +1,5 @@
 import webpush from "web-push";
+import { CONTACT_EMAIL } from "../config";
 import { sql } from "./db";
 
 /** Sends a Telegram message, with an optional button that opens a SaqBot screen. */
@@ -22,7 +23,7 @@ function setupVapid() {
   const pub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const priv = process.env.VAPID_PRIVATE_KEY;
   if (!pub || !priv) return false;
-  webpush.setVapidDetails(process.env.VAPID_SUBJECT ?? "mailto:hello@saqbot.xyz", pub, priv);
+  webpush.setVapidDetails(process.env.VAPID_SUBJECT ?? `mailto:${CONTACT_EMAIL}`, pub, priv);
   vapidReady = true;
   return true;
 }
