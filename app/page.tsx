@@ -35,8 +35,7 @@ export default function Welcome() {
         </div>
         <div className="spacer" />
         <div className="stack" style={{ gap: 12 }}>
-          <button className="btn" disabled={!ready} onClick={() => login({ loginMethods: ["apple"] })}>Continue with Apple</button>
-          <button className="btn btn-quiet" disabled={!ready} onClick={() => login({ loginMethods: ["google"] })}>Continue with Google</button>
+          <button className="btn" disabled={!ready} onClick={() => login({ loginMethods: ["google"] })}>Continue with Google</button>
           <button className="btn btn-quiet" disabled={!ready} onClick={() => login({ loginMethods: ["email"] })}>Continue with email</button>
           <Link className="btn btn-text" href="/practice">Do a practice run first, no sign-up</Link>
           <p className="tiny" style={{ textAlign: "center" }}>

@@ -16,7 +16,7 @@ Plan the job (with full send), Active jobs, Practice run, Alerts and intel.
 
 ## How the money side works
 
-- **Sign-in and wallets:** Privy creates a wallet for each user (Apple, Google or email). Existing wallets can connect too.
+- **Sign-in and wallets:** Privy creates a wallet for each user (Google or email). Existing wallets can connect too.
 - **Funding:** Privy's on-ramp buys USDC on Arbitrum, or users send USDC from an exchange. "Move to my stash" sends it to Hyperliquid's bridge. Deposits under 5 USDC are lost by the bridge, so the app refuses anything under 6.
 - **Trading:** "Start trading session" approves the SaqBot builder fee (skipped for BAWSAQ holders) and a trade-only agent key that is stored on the phone. It can trade but never withdraw. SaqBot's servers never hold keys or funds.
 - **Fees:** non-holders pay `NEXT_PUBLIC_BUILDER_FEE_TENTHS_BP` (default 0.05%). Wallets holding 1M+ BAWSAQ on Robinhood Chain, including wallets linked in Privy, pay 0%.
@@ -25,7 +25,7 @@ Plan the job (with full send), Active jobs, Practice run, Alerts and intel.
 ## Setup
 
 1. **Install:** Node 20+, then `npm install`.
-2. **Privy:** create an app at privy.io. Enable Apple, Google, email and wallet login, enable Ethereum embedded wallets, and turn on the card on-ramp under Funding. Add `saqbot.xyz` and `localhost:3000` as allowed origins. Copy the App ID and verification key.
+2. **Privy:** create an app at privy.io. Enable Google, email and wallet login, enable Ethereum embedded wallets, and turn on the card on-ramp under Funding. Add `saqbot.xyz` and `localhost:3000` as allowed origins. Copy the App ID and verification key.
 3. **Database:** create a Postgres database and run `npm run db:setup`.
 4. **Push keys:** `npm run vapid`, then copy both keys into your env.
 5. **Telegram:** reuse the @Trade_SaqBot token from BotFather.

@@ -23,7 +23,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <PrivyProvider
       appId={PRIVY_APP_ID}
       config={{
-        loginMethods: ["apple", "google", "email", "wallet"],
+        loginMethods: ["google", "email", "wallet"],
         appearance: { theme: "light", accentColor: "#24361a", logo: "/icon-192.png" },
         embeddedWallets: { ethereum: { createOnLogin: "users-without-wallets" } },
         defaultChain: chain,
