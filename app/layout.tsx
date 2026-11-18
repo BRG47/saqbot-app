@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Barlow, Barlow_Condensed } from "next/font/google";
+import { headers } from "next/headers";
 import type { ReactNode } from "react";
 import { Providers } from "./providers";
 import "./globals.css";
@@ -23,7 +24,9 @@ export const viewport: Viewport = {
   colorScheme: "dark",
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // Reading headers renders each page per request, so every page gets the CSP nonce from middleware.ts.
+  await headers();
   return (
     <html lang="en" className={`${body.variable} ${display.variable}`}>
       <body>

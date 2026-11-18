@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { EVENT_TYPES } from "../../../../lib/events";
 import { sql } from "../../../../lib/server/db";
 
@@ -8,7 +9,8 @@ import { sql } from "../../../../lib/server/db";
  */
 export async function POST(req: Request) {
   const token = process.env.ADMIN_TOKEN;
-  if (!token || req.headers.get("authorization") !== `Bearer ${token}`) {
+  const digest = (s: string) => createHash("sha256").update(s).digest();
+  if (!token || !timingSafeEqual(digest(req.headers.get("authorization") ?? ""), digest(`Bearer ${token}`))) {
     return Response.json({ error: "Not allowed." }, { status: 401 });
   }
   const b = (await req.json()) as { type?: string; title?: string; detail?: string; coin?: string; startsAt?: string };
