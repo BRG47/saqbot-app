@@ -28,7 +28,7 @@ Plan the job (with full send), Active jobs, Practice run, Alerts and intel.
 2. **Privy:** create an app at privy.io. Enable Google, email and wallet login, enable Ethereum embedded wallets, and turn on the card on-ramp under Funding. Add `saqbot.xyz` and `localhost:3000` as allowed origins. Copy the App ID and verification key.
 3. **Database:** create a Postgres database and run `npm run db:setup`.
 4. **Push keys:** `npm run vapid`, then copy both keys into your env.
-5. **Telegram:** reuse the @Trade_SaqBot token from BotFather.
+5. **Telegram:** reuse the @TradeSaqBot token from BotFather.
 6. **Env:** `cp .env.example .env.local` and fill it in. Leave `NEXT_PUBLIC_HL_TESTNET=true`.
 7. **Run:** `npm run dev` for the app and `npm run worker` in a second terminal.
 

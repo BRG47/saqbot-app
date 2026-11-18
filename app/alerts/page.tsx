@@ -67,7 +67,7 @@ export default function Alerts() {
           <ToggleRow title="App notifications" sub="On iPhone, add SaqBot to your home screen first" checked={a.push} onChange={setPush} />
           <ToggleRow
             title="Telegram"
-            sub={me.data?.telegramLinked ? "Linked to @Trade_SaqBot, read-only" : "From @Trade_SaqBot, read-only"}
+            sub={me.data?.telegramLinked ? "Linked to @TradeSaqBot, read-only" : "From @TradeSaqBot, read-only"}
             checked={a.telegram}
             onChange={(on) => (on && !me.data?.telegramLinked ? linkTelegram() : updatePrefs({ alerts: { ...a, telegram: on } }))}
           />

@@ -19,7 +19,7 @@ export const ROBINHOOD_RPC = env("NEXT_PUBLIC_ROBINHOOD_RPC", "https://rpc.mainn
 export const ROBINHOOD_CHAIN_ID = 4663;
 
 export const PRIVY_APP_ID = env("NEXT_PUBLIC_PRIVY_APP_ID");
-export const TELEGRAM_BOT_USERNAME = env("NEXT_PUBLIC_TELEGRAM_BOT_USERNAME", "Trade_SaqBot");
+export const TELEGRAM_BOT_USERNAME = env("NEXT_PUBLIC_TELEGRAM_BOT_USERNAME", "TradeSaqBot");
 export const VAPID_PUBLIC_KEY = env("NEXT_PUBLIC_VAPID_PUBLIC_KEY");
 
 /** Hyperliquid rejects orders below this notional value. */

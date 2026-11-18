@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     const code = randomBytes(12).toString("hex");
     await sql`insert into users (id) values (${id}) on conflict do nothing`;
     await sql`insert into telegram_links (code, user_id, expires_at) values (${code}, ${id}, now() + interval '15 minutes')`;
-    const bot = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ?? "Trade_SaqBot";
+    const bot = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ?? "TradeSaqBot";
     return Response.json({ url: `https://t.me/${bot}?start=${code}` });
   } catch (e) {
     return errorResponse(e);
