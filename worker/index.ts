@@ -5,6 +5,7 @@
  * Telegram is read-only: nothing here can place trades or move money.
  */
 import { Bot } from "grammy";
+import { BLS_ICS_URL, FOMC_DECISION_DAYS, blsEvents, expiryEvents, fomcEvents, type SyncedEvent } from "../lib/calendar";
 import { EVENT_TYPES, starsFromMove, type EventType } from "../lib/events";
 import { getAccountState, getMarkets, getMids, info } from "../lib/hyperliquid";
 import { sql } from "../lib/server/db";
@@ -184,6 +185,48 @@ async function ratingsLoop() {
   await sql`delete from alerts_sent where sent_at < now() - interval '14 days'`;
 }
 
+/**
+ * Free calendar sync: BLS jobs and CPI releases, FOMC rate decisions and options expiries.
+ * Synced rows carry a source_id, so reschedules update in place and cancelled releases are removed.
+ */
+async function calendarLoop() {
+  const events: SyncedEvent[] = [...fomcEvents(), ...expiryEvents(new Date(), 4)];
+
+  let blsIds: string[] | null = null;
+  try {
+    const contact = process.env.CALENDAR_CONTACT_EMAIL ?? "hello@saqbot.xyz";
+    const res = await fetch(BLS_ICS_URL, { headers: { "user-agent": `SaqBot calendar sync (${contact})`, accept: "text/calendar" } });
+    if (!res.ok) throw new Error(`BLS calendar returned ${res.status}`);
+    const bls = blsEvents(await res.text());
+    events.push(...bls);
+    blsIds = bls.map((e) => e.sourceId);
+  } catch (e) {
+    console.error("BLS calendar fetch failed; keeping the events already saved", e);
+  }
+
+  const cutoff = Date.now() - 200 * 86_400_000;
+  for (const e of events) {
+    if (e.startsAt.getTime() < cutoff) continue;
+    await sql`
+      insert into market_events (source_id, type, title, detail, starts_at)
+      values (${e.sourceId}, ${e.type}, ${e.title}, ${e.detail}, ${e.startsAt})
+      on conflict (source_id) do update set type = excluded.type, title = excluded.title, detail = excluded.detail, starts_at = excluded.starts_at`;
+  }
+
+  // Remove future releases a source no longer lists (for example, a rescheduled or cancelled BLS release).
+  if (blsIds && blsIds.length > 0) {
+    await sql`delete from market_events where source_id like 'bls:%' and starts_at > now() and source_id not in ${sql(blsIds)}`;
+  }
+  const fomcIds = fomcEvents().map((e) => e.sourceId);
+  await sql`delete from market_events where source_id like 'fomc:%' and starts_at > now() and source_id not in ${sql(fomcIds)}`;
+
+  const lastFomc = FOMC_DECISION_DAYS[FOMC_DECISION_DAYS.length - 1];
+  if (new Date(lastFomc).getTime() - Date.now() < 120 * 86_400_000) {
+    console.warn(`FOMC dates in lib/calendar.ts run out on ${lastFomc}. Add next year's schedule from federalreserve.gov.`);
+  }
+  console.log(`Calendar sync: ${events.length} events checked${blsIds ? `, ${blsIds.length} from BLS` : ", BLS skipped"}`);
+}
+
 function every(ms: number, name: string, fn: () => Promise<void>) {
   const run = () => fn().catch((e) => console.error(`${name} failed`, e));
   run();
@@ -194,6 +237,7 @@ every(60_000, "heat", heatLoop);
 every(5 * 60_000, "moves", movesLoop);
 every(15 * 60_000, "crowded", crowdedLoop);
 every(5 * 60_000, "events", eventsLoop);
+every(12 * 3_600_000, "calendar", calendarLoop);
 every(6 * 3_600_000, "ratings", ratingsLoop);
 
 bot.start({ onStart: (me) => console.log(`SaqBot worker running as @${me.username}`) });

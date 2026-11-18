@@ -46,3 +46,7 @@ create table if not exists alerts_sent (
   key text primary key,
   sent_at timestamptz not null default now()
 );
+
+-- Calendar sync (added later): lets synced events be updated or removed when a source reschedules them.
+alter table market_events add column if not exists source_id text;
+create unique index if not exists market_events_source_id on market_events (source_id);

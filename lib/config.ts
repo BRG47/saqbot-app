@@ -1,5 +1,20 @@
 /** Public configuration. Everything here ships to the browser, so no secrets. */
-const env = (k: string, d = "") => (process.env[k] ?? d).trim();
+/**
+ * Next.js only inlines NEXT_PUBLIC_* vars into browser code when referenced literally
+ * (process.env.NEXT_PUBLIC_X), so each one is listed here instead of read by key.
+ */
+const PUBLIC_ENV: Record<string, string | undefined> = {
+  NEXT_PUBLIC_HL_TESTNET: process.env.NEXT_PUBLIC_HL_TESTNET,
+  NEXT_PUBLIC_BUILDER_ADDRESS: process.env.NEXT_PUBLIC_BUILDER_ADDRESS,
+  NEXT_PUBLIC_BUILDER_FEE_TENTHS_BP: process.env.NEXT_PUBLIC_BUILDER_FEE_TENTHS_BP,
+  NEXT_PUBLIC_BAWSAQ_TOKEN: process.env.NEXT_PUBLIC_BAWSAQ_TOKEN,
+  NEXT_PUBLIC_BAWSAQ_MIN_HOLD: process.env.NEXT_PUBLIC_BAWSAQ_MIN_HOLD,
+  NEXT_PUBLIC_ROBINHOOD_RPC: process.env.NEXT_PUBLIC_ROBINHOOD_RPC,
+  NEXT_PUBLIC_PRIVY_APP_ID: process.env.NEXT_PUBLIC_PRIVY_APP_ID,
+  NEXT_PUBLIC_TELEGRAM_BOT_USERNAME: process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME,
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+};
+const env = (k: keyof typeof PUBLIC_ENV, d = "") => (PUBLIC_ENV[k] || d).trim();
 const isAddr = (a: string) => /^0x[0-9a-fA-F]{40}$/.test(a);
 
 export const IS_TESTNET = env("NEXT_PUBLIC_HL_TESTNET", "true") !== "false";

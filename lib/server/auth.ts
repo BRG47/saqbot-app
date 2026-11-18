@@ -3,6 +3,20 @@ import { importSPKI, jwtVerify } from "jose";
 let keyPromise: ReturnType<typeof importSPKI> | null = null;
 
 /**
+ * Rebuilds the Privy verification key as clean PEM, whatever shape it arrives in:
+ * with or without BEGIN/END lines, "\n" escapes, real line breaks, quotes, or
+ * dashes and quotes that a text editor "smartened" into curly versions.
+ */
+export function toPem(raw: string): string {
+  const body = raw
+    .replace(/\\n/g, "")
+    .replace(/[-\u2010-\u2015]*\s*(BEGIN|END) PUBLIC KEY\s*[-\u2010-\u2015]*/g, "")
+    .replace(/[^A-Za-z0-9+/=]/g, "");
+  const lines = body.match(/.{1,64}/g) ?? [];
+  return `-----BEGIN PUBLIC KEY-----\n${lines.join("\n")}\n-----END PUBLIC KEY-----`;
+}
+
+/**
  * Verifies the Privy access token sent as "Authorization: Bearer <token>" and
  * returns the Privy user id. The verification key comes from the Privy dashboard.
  */
@@ -11,7 +25,7 @@ export async function requireUser(req: Request): Promise<string> {
   if (!token) throw new HttpError(401, "Sign in first.");
   const pem = process.env.PRIVY_VERIFICATION_KEY;
   if (!pem) throw new HttpError(500, "Server is missing PRIVY_VERIFICATION_KEY.");
-  keyPromise ??= importSPKI(pem.replace(/\\n/g, "\n"), "ES256");
+  keyPromise ??= importSPKI(toPem(pem), "ES256");
   try {
     const { payload } = await jwtVerify(token, await keyPromise, {
       issuer: "privy.io",
