@@ -24,7 +24,7 @@ export const config = {
   // Pages only: skip API routes, static files, images, the service worker and the manifest.
   matcher: [
     {
-      source: "/((?!api|_next/static|_next/image|sw\\.js|manifest\\.webmanifest|.*\\.(?:png|ico|svg|jpg|jpeg|webp|txt)$).*)",
+      source: "/((?!api|_next/static|_next/image|sw\\.js|manifest\\.webmanifest|.*\\.(?:png|ico|svg|jpg|jpeg|webp|txt|mp4)$).*)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },

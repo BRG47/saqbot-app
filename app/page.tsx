@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePrivy } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Brand } from "../components/ui";
 import { useSaqbot } from "../lib/client/saqbot";
 
@@ -11,6 +11,16 @@ export default function Welcome() {
   const { ready, authenticated, prefs } = useSaqbot();
   const { login } = usePrivy();
   const router = useRouter();
+  const video = useRef<HTMLVideoElement>(null);
+
+  // Respect "reduce motion": don't autoplay, show controls so people can play it themselves.
+  useEffect(() => {
+    const v = video.current;
+    if (v && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      v.pause();
+      v.controls = true;
+    }
+  }, []);
 
   useEffect(() => {
     if (ready && authenticated) router.replace(prefs.rep ? "/home" : "/rep");
@@ -23,11 +33,18 @@ export default function Welcome() {
       </header>
       <main className="screen">
         <div className="stack" style={{ gap: 14, paddingTop: 8 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/logo.png"
-            alt="SaqBot logo: a neon green rifle riding a rising price chart"
-            style={{ width: "min(260px, 70%)", height: "auto", alignSelf: "center", filter: "drop-shadow(0 0 18px rgba(57, 255, 20, 0.35))" }}
+          {/* Plays once, muted (browsers only autoplay muted video), then holds on the last frame. */}
+          <video
+            ref={video}
+            className="landing-video"
+            src="/landing.mp4"
+            width={896}
+            height={336}
+            autoPlay
+            muted
+            playsInline
+            preload="auto"
+            aria-label="SaqBot intro animation"
           />
           <h1 className="display" style={{ fontSize: 56, lineHeight: 0.95 }}>
             Profit is the <span style={{ color: "var(--neon)", textShadow: "0 0 16px rgba(57, 255, 20, 0.5)" }}>TARGET</span>
