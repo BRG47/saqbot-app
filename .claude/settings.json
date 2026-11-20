@@ -1,0 +1,9 @@
+{
+  "sandbox": {
+    "network": {
+      "allowedDomains": [
+        "ep-lingering-night-beo0s43z.c-9.us-east-2.aws.neon.tech"
+      ]
+    }
+  }
+}

@@ -17,6 +17,8 @@ export type Prefs = {
   briefed: boolean;
   dailyLossLimit: number | null;
   alerts: AlertSettings;
+  /** When the user confirmed they aren't a resident or citizen of a restricted region. */
+  eligibleConfirmedAt: string | null;
 };
 
 export const DEFAULT_PREFS: Prefs = {
@@ -24,6 +26,7 @@ export const DEFAULT_PREFS: Prefs = {
   mode: "practice",
   briefed: false,
   dailyLossLimit: null,
+  eligibleConfirmedAt: null,
   alerts: { push: true, telegram: false, events: true, moves: true, crowded: false, heat: true, watchlist: ["BTC", "ETH", "SOL"] },
 };
 

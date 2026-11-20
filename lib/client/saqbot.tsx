@@ -12,6 +12,7 @@ import { depositChain } from "../deposit";
 import { feeFor } from "../holder";
 import { getAccountState, getMarkets, info, transport, type AccountState, type Market } from "../hyperliquid";
 import { DEFAULT_PREFS, loadPrefs, savePrefs, type Prefs } from "../prefs";
+import { useGeoRestricted } from "./geo";
 
 type Saqbot = {
   ready: boolean;
@@ -33,6 +34,8 @@ type Saqbot = {
   account: AccountState | null;
   refetchAccount: () => void;
   fee: { fee: number; holder: boolean; balance: number } | null;
+  /** Visitor is in a region where opening live jobs and funding are switched off. */
+  geoRestricted: boolean;
 };
 
 const Ctx = createContext<Saqbot | null>(null);
@@ -51,6 +54,7 @@ export function SaqbotProvider({ children }: { children: ReactNode }) {
 
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [agent, setAgent] = useState<PrivateKeyAccount | null>(null);
+  const geoRestricted = useGeoRestricted();
 
   useEffect(() => setPrefs(loadPrefs()), []);
   useEffect(() => setAgent(address ? loadAgent(address) : null), [address]);
@@ -68,6 +72,21 @@ export function SaqbotProvider({ children }: { children: ReactNode }) {
     },
     [getAccessToken],
   );
+
+  // Alert settings can also change from Telegram (/menu, mute buttons), so pull the server copy after sign-in.
+  useEffect(() => {
+    if (!authenticated) return;
+    api<{ rep: Prefs["rep"]; alerts: Partial<Prefs["alerts"]> | null }>("/api/me")
+      .then((me) => {
+        if (!me.alerts || Object.keys(me.alerts).length === 0) return;
+        setPrefs((prev) => {
+          const next = { ...prev, rep: prev.rep ?? me.rep, alerts: { ...prev.alerts, ...me.alerts } };
+          savePrefs(next);
+          return next;
+        });
+      })
+      .catch(() => {});
+  }, [authenticated, api]);
 
   const updatePrefs = useCallback(
     (patch: Partial<Prefs>) => {
@@ -115,6 +134,8 @@ export function SaqbotProvider({ children }: { children: ReactNode }) {
   /** One-time setup before live trading: approve the SaqBot fee (non-holders) and create the trade-only key. */
   const startSession = useCallback(async () => {
     if (!address) throw new Error("Sign in first.");
+    if (geoRestricted) throw new Error("Live trading isn't available in your region.");
+    if (!prefs.eligibleConfirmedAt) throw new Error("Confirm you're eligible to trade before starting a session.");
     const exchange = new ExchangeClient({ transport, wallet: await getWalletClient() });
     const needsFee = BUILDER_ADDRESS && (feeQ.data?.fee ?? 1) > 0;
     if (needsFee) {
@@ -128,7 +149,7 @@ export function SaqbotProvider({ children }: { children: ReactNode }) {
     await exchange.approveAgent({ agentAddress: next.address, agentName: "saqbot" });
     saveAgentKey(address, pk);
     setAgent(next);
-  }, [address, getWalletClient, feeQ.data]);
+  }, [address, getWalletClient, feeQ.data, geoRestricted, prefs.eligibleConfirmedAt]);
 
   const endSession = useCallback(() => {
     if (address) clearAgent(address);
@@ -158,6 +179,7 @@ export function SaqbotProvider({ children }: { children: ReactNode }) {
     account: accountQ.data ?? null,
     refetchAccount: () => void accountQ.refetch(),
     fee: feeQ.data ?? null,
+    geoRestricted,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

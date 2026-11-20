@@ -8,15 +8,16 @@ import { useState } from "react";
 import { createPublicClient, erc20Abi, formatUnits, http } from "viem";
 import { Band, useRequireSignIn, usd } from "../../components/ui";
 import { useSaqbot } from "../../lib/client/saqbot";
-import { ARB_USDC, BAWSAQ_MIN_HOLD, BUILDER_FEE_LABEL, IS_TESTNET, MIN_DEPOSIT_USDC } from "../../lib/config";
+import { ARB_USDC, BAWSAQ_MIN_HOLD, BUILDER_FEE_PERCENT, IS_TESTNET, MIN_DEPOSIT_USDC } from "../../lib/config";
 import { depositChain, depositToHyperliquid } from "../../lib/deposit";
 import { transport } from "../../lib/hyperliquid";
+import { RESTRICTED_MESSAGE } from "../../lib/client/geo";
 
 const arb = createPublicClient({ chain: depositChain, transport: http() });
 
 export default function Fund() {
   const signedIn = useRequireSignIn();
-  const { address, account, refetchAccount, getWalletClient, agent, startSession, fee, linkWallet } = useSaqbot();
+  const { address, account, refetchAccount, getWalletClient, agent, startSession, fee, linkWallet, geoRestricted, prefs, updatePrefs } = useSaqbot();
   const { fundWallet } = useFundWallet();
   const [amount, setAmount] = useState("");
   const [withdrawAmt, setWithdrawAmt] = useState("");
@@ -67,32 +68,21 @@ export default function Fund() {
           <p className="tiny">USDC waiting in your wallet: {usd(inWallet)}</p>
         </div>
 
+        {geoRestricted && <p className="notice notice-warn">{RESTRICTED_MESSAGE}</p>}
+
+        {!geoRestricted && (
+        <>
         <section className="stack">
           <h2 className="display h2">1. Get USDC</h2>
           <button
             className="btn"
-            disabled={busy !== null || IS_TESTNET}
+            disabled={busy !== null}
             onClick={() =>
-              run(
-                "card",
-                async () => {
-                  const res = await fundWallet({
-                    address,
-                    options: { chain: depositChain, asset: "USDC", amount: "50", defaultFundingMethod: "card", card: { preferredProvider: "coinbase" } },
-                  });
-                  if (res.status === "cancelled") throw new Error("You cancelled the request. Nothing was sent.");
-                },
-                "Payment done. Your USDC shows up here in a few minutes.",
-              )
+              run("card", () => fundWallet({ address, options: { chain: depositChain, asset: "USDC", amount: "50" } }), "Payment started. Your USDC shows up here in a few minutes.")
             }
           >
-            {busy === "card" ? "Opening checkout…" : "Buy USDC with Apple Pay or card"}
+            Buy USDC with Apple Pay or card
           </button>
-          <p className="tiny" style={{ marginTop: -4 }}>
-            {IS_TESTNET
-              ? "Card and Apple Pay purchases switch on with real-money trading. On testnet, use test USDC from Hyperliquid's faucet."
-              : "Apple Pay shows up in Safari on iPhone and Mac. Card checkout is run by Coinbase or MoonPay; they may ask for ID the first time."}
-          </p>
           <div className="panel" style={{ gap: 8 }}>
             <strong>Or send from an exchange</strong>
             <p className="small">Withdraw <b>USDC</b> on the <b>Arbitrum One</b> network to this address. Other tokens or networks can be lost.</p>
@@ -129,24 +119,40 @@ export default function Fund() {
           <p className="small">
             {fee?.holder
               ? "You hold enough BAWSAQ to trade with 0% SaqBot fees."
-              : `SaqBot charges ${BUILDER_FEE_LABEL} of each trade's value. Hold ${BAWSAQ_MIN_HOLD.toLocaleString("en-US")} BAWSAQ for 0%.`}{" "}
+              : `SaqBot charges ${BUILDER_FEE_PERCENT} of each trade's value. Hold ${BAWSAQ_MIN_HOLD.toLocaleString("en-US")} BAWSAQ for 0%.`}{" "}
             The session creates a trade-only key on this phone. It can place and close trades but can never withdraw.
           </p>
           {!fee?.holder && (
             <button className="btn btn-quiet btn-sm" onClick={linkWallet}>Link the wallet that holds my BAWSAQ</button>
+          )}
+          {!agent && (
+            <label style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 15 }}>
+              <input
+                type="checkbox"
+                checked={Boolean(prefs.eligibleConfirmedAt)}
+                onChange={(e) => updatePrefs({ eligibleConfirmedAt: e.target.checked ? new Date().toISOString() : null })}
+                style={{ width: 22, height: 22, marginTop: 1, accentColor: "var(--ink)" }}
+              />
+              <span>
+                I'm not a resident or citizen of the United States or another region where Hyperliquid isn't available, and I'm not
+                using a VPN or proxy to hide my location.
+              </span>
+            </label>
           )}
           {agent ? (
             <p className="notice notice-ok">Trading session active on this device.</p>
           ) : (
             <button
               className="btn"
-              disabled={busy !== null || stash <= 0}
+              disabled={busy !== null || stash <= 0 || !prefs.eligibleConfirmedAt}
               onClick={() => run("session", startSession, "You're set. Time to plan a job.")}
             >
               {stash <= 0 ? "Fund your stash first" : busy === "session" ? "Check the approval…" : "Start trading session"}
             </button>
           )}
         </section>
+        </>
+        )}
 
         {msg && <p className={`notice notice-${msg.kind}`} role="status">{msg.text}</p>}
 

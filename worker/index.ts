@@ -1,90 +1,76 @@
 /**
- * SaqBot worker: runs the Telegram bot and sends alerts.
+ * SaqBot worker: runs @TradeSaqBot and sends alerts.
  * Start with `npm run worker` on an always-on host (Railway, Fly.io).
  *
  * Telegram is read-only: nothing here can place trades or move money.
  */
-import { Bot } from "grammy";
-import { CONTACT_EMAIL } from "../lib/config";
 import { BLS_ICS_URL, FOMC_DECISION_DAYS, blsEvents, expiryEvents, fomcEvents, type SyncedEvent } from "../lib/calendar";
 import { EVENT_TYPES, starsFromMove, type EventType } from "../lib/events";
 import { getAccountState, getMarkets, getMids, info } from "../lib/hyperliquid";
 import { sql } from "../lib/server/db";
-import { claimAlert, sendPush, sendTelegram } from "../lib/server/notify";
-
-type Alerts = { push?: boolean; telegram?: boolean; events?: boolean; moves?: boolean; crowded?: boolean; heat?: boolean; watchlist?: string[] };
-type UserRow = { id: string; wallet: string | null; alerts: Alerts; telegram_chat_id: string | null };
+import { claimAlert, sendPush } from "../lib/server/notify";
+import { alertMessage, configureBot, createBot, fmtPx, isMuted, usersAll, type Alert, type UserRow } from "./telegram";
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) throw new Error("TELEGRAM_BOT_TOKEN is required");
-const bot = new Bot(token);
+const bot = createBot(token);
 
-const users = () => sql<UserRow[]>`select id, wallet, alerts, telegram_chat_id from users`;
 const hourBucket = () => Math.floor(Date.now() / 3_600_000);
+const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 
-/** Delivers one alert to every channel the user switched on. */
-async function deliver(u: UserRow, title: string, body: string, path: string) {
+/** Delivers one alert to every channel the user switched on, unless they muted it. */
+async function deliver(u: UserRow, alert: Alert) {
+  if (isMuted(u.alerts, alert)) return;
   const jobs: Promise<unknown>[] = [];
   if (u.alerts.telegram && u.telegram_chat_id) {
-    jobs.push(sendTelegram(u.telegram_chat_id, `<b>${title}</b>\n${body}`, { label: "Open SaqBot", path }));
+    const { text, keyboard } = alertMessage(alert);
+    jobs.push(bot.api.sendMessage(Number(u.telegram_chat_id), text, { parse_mode: "HTML", reply_markup: keyboard, link_preview_options: { is_disabled: true } }));
   }
-  if (u.alerts.push !== false) jobs.push(sendPush(u.id, title, body, path));
-  await Promise.allSettled(jobs);
+  if (u.alerts.push !== false) jobs.push(sendPush(u.id, `${alert.tag}: ${alert.headline}`, alert.lines.join(" "), alert.path));
+  const results = await Promise.allSettled(jobs);
+  for (const r of results) if (r.status === "rejected") console.error("alert delivery failed", u.id, r.reason);
 }
-
-// ---------- Telegram commands ----------
-
-bot.command("start", async (ctx) => {
-  const code = ctx.match?.trim();
-  if (!code) {
-    return ctx.reply(
-      "Welcome to SaqBot. I send heat alerts on your jobs, big market moves and 5-star events.\n\nTo link me, open SaqBot, go to Alerts and switch on Telegram.\n\nI'll never ask for your seed phrase or keys.",
-    );
-  }
-  const [link] = await sql<{ user_id: string }[]>`
-    delete from telegram_links where code = ${code} and expires_at > now() returning user_id`;
-  if (!link) return ctx.reply("That link expired. Open SaqBot, go to Alerts and switch Telegram on again.");
-  await sql`update users set telegram_chat_id = null where telegram_chat_id = ${ctx.chat.id}`;
-  await sql`update users set telegram_chat_id = ${ctx.chat.id}, alerts = alerts || '{"telegram": true}'::jsonb where id = ${link.user_id}`;
-  return ctx.reply("Linked. You'll get your SaqBot alerts here. Send /stop anytime to unlink.");
-});
-
-bot.command("stop", async (ctx) => {
-  await sql`update users set telegram_chat_id = null, alerts = alerts || '{"telegram": false}'::jsonb where telegram_chat_id = ${ctx.chat.id}`;
-  return ctx.reply("Unlinked. No more alerts here.");
-});
-
-bot.command("events", async (ctx) => {
-  const rows = await sql<{ title: string; starts_at: Date; stars: number | null; type: EventType }[]>`
-    select e.title, e.starts_at, e.type, r.stars from market_events e left join event_ratings r on r.type = e.type
-    where e.starts_at > now() and e.starts_at < now() + interval '7 days' order by e.starts_at limit 10`;
-  if (rows.length === 0) return ctx.reply("No 5-star events scheduled this week. Quiet streets.");
-  const lines = rows.map((r) => `${"★".repeat(r.stars ?? EVENT_TYPES[r.type]?.fallbackStars ?? 2)} ${r.title}, ${r.starts_at.toUTCString().slice(0, 22)} UTC`);
-  return ctx.reply(`Upcoming 5-star events:\n\n${lines.join("\n")}`);
-});
-
-bot.catch((err) => console.error("Bot error", err));
 
 // ---------- Alert loops ----------
 
 /** Heat on active jobs: price close to the stop or to liquidation. */
 async function heatLoop() {
   const mids = await getMids();
-  for (const u of await users()) {
+  for (const u of await usersAll()) {
     if (!u.wallet || u.alerts.heat === false) continue;
     try {
       const state = await getAccountState(u.wallet as `0x${string}`);
       for (const p of state.positions) {
         const mark = mids[p.coin];
         if (!mark) continue;
-        const name = `${p.coin} ${p.side}`;
+        const name = `${p.coin} ${p.side}, ${p.leverage}x`;
+        const pnl = `${p.unrealizedPnl >= 0 ? "+" : "−"}$${Math.abs(p.unrealizedPnl).toFixed(2)}`;
         if (p.liqPx && Math.abs(mark - p.liqPx) / mark < 0.03) {
           if (await claimAlert(`heat:${u.id}:${p.coin}:liq:${hourBucket()}`)) {
-            await deliver(u, `5-star heat on your ${name}`, `Price is within 3% of liquidation (${p.liqPx}). Cash out, add margin or set a stop now.`, "/jobs");
+            await deliver(u, {
+              kind: "heat",
+              stars: 5,
+              tag: "5-STAR HEAT",
+              headline: `${name} is ${pct(Math.abs(mark - p.liqPx) / mark)} from liquidation`,
+              lines: [`Price ${fmtPx(mark)}  •  Liquidation ${fmtPx(p.liqPx)}`, `Open P/L ${pnl}`],
+              tip: p.stopPx ? "Your stop is set, but liquidation is close. Consider cashing out or cutting size." : "Full send, no stop. Cash out or set a stop now, or this job gets Wasted.",
+              path: "/jobs",
+              coin: p.coin,
+              critical: true,
+            });
           }
         } else if (p.stopPx && Math.abs(mark - p.stopPx) / mark < 0.01) {
           if (await claimAlert(`heat:${u.id}:${p.coin}:stop:${hourBucket()}`)) {
-            await deliver(u, `Heat's rising on your ${name}`, `Price is within 1% of your stop at ${p.stopPx}. If it hits, the loss stays what you planned.`, "/jobs");
+            await deliver(u, {
+              kind: "heat",
+              stars: 3,
+              tag: "HEAT'S RISING",
+              headline: `${name} is ${pct(Math.abs(mark - p.stopPx) / mark)} from your stop`,
+              lines: [`Price ${fmtPx(mark)}  •  Stop ${fmtPx(p.stopPx)}`, `Open P/L ${pnl}`],
+              tip: "If it hits, the loss stays what you planned. That's the getaway working.",
+              path: "/jobs",
+              coin: p.coin,
+            });
           }
         }
       }
@@ -96,7 +82,7 @@ async function heatLoop() {
 
 /** Big moves: the last full hour moved sharply on at least twice the usual volume. */
 async function movesLoop() {
-  const all = await users();
+  const all = await usersAll();
   const coins = new Set(all.filter((u) => u.alerts.moves !== false).flatMap((u) => u.alerts.watchlist ?? ["BTC", "ETH", "SOL"]));
   for (const coin of coins) {
     try {
@@ -104,15 +90,24 @@ async function movesLoop() {
       if (candles.length < 6) continue;
       const last = candles[candles.length - 2]; // last fully closed hour
       const prior = candles.slice(0, -2);
-      const change = (Number(last.c) / Number(last.o) - 1) * 100;
+      const change = Number(last.c) / Number(last.o) - 1;
       const avgVol = prior.reduce((s, c) => s + Number(c.v), 0) / prior.length;
-      const threshold = coin === "BTC" || coin === "ETH" ? 2 : 4;
-      if (Math.abs(change) < threshold || Number(last.v) < avgVol * 2) continue;
-      const title = `${coin} ${change > 0 ? "ripped" : "dumped"} ${Math.abs(change).toFixed(1)}% in an hour`;
-      const body = `Volume was ${(Number(last.v) / avgVol).toFixed(1)}x the usual. Moves like this often bring more heat. Check your jobs.`;
+      const threshold = coin === "BTC" || coin === "ETH" ? 0.02 : 0.04;
+      const volX = Number(last.v) / avgVol;
+      if (Math.abs(change) < threshold || volX < 2) continue;
+      const alert: Alert = {
+        kind: "move",
+        stars: Math.abs(change) >= threshold * 2 || volX >= 4 ? 4 : 3,
+        tag: change > 0 ? "BIG MOVE UP" : "BIG MOVE DOWN",
+        headline: `${coin} ${change > 0 ? "ripped" : "dumped"} ${pct(Math.abs(change))} in an hour`,
+        lines: [`Now ${fmtPx(Number(last.c))}  •  Volume ${volX.toFixed(1)}x the usual`],
+        tip: "Moves like this often bring more heat. Check your getaways.",
+        path: "/home",
+        coin,
+      };
       for (const u of all) {
         if (u.alerts.moves === false || !(u.alerts.watchlist ?? ["BTC", "ETH", "SOL"]).includes(coin)) continue;
-        if (await claimAlert(`move:${u.id}:${coin}:${last.t}`)) await deliver(u, title, body, "/home");
+        if (await claimAlert(`move:${u.id}:${coin}:${last.t}`)) await deliver(u, alert);
       }
     } catch (e) {
       console.error("move check failed", coin, e);
@@ -122,38 +117,53 @@ async function movesLoop() {
 
 /** Crowded trades: funding so high that one side is paying heavily to stay in. */
 async function crowdedLoop() {
-  const all = (await users()).filter((u) => u.alerts.crowded);
+  const all = (await usersAll()).filter((u) => u.alerts.crowded);
   if (all.length === 0) return;
   const markets = await getMarkets();
   const bucket = Math.floor(Date.now() / (6 * 3_600_000));
   for (const m of markets.slice(0, 40)) {
     if (Math.abs(m.funding) < 0.0001) continue;
     const longs = m.funding > 0;
-    const title = `Crowded trade on ${m.name}`;
-    const body = `${longs ? "Longs" : "Shorts"} are paying ${(Math.abs(m.funding) * 100).toFixed(3)}% an hour to stay in. Crowded sides can unwind fast.`;
+    const alert: Alert = {
+      kind: "crowded",
+      stars: Math.abs(m.funding) >= 0.0003 ? 4 : 3,
+      tag: "CROWDED TRADE",
+      headline: `${m.name} ${longs ? "longs" : "shorts"} are piling in`,
+      lines: [`${longs ? "Longs" : "Shorts"} pay ${(Math.abs(m.funding) * 100).toFixed(3)}% an hour to stay in`, `Price ${fmtPx(m.markPx)}`],
+      tip: "Crowded sides can unwind fast. Everyone heading for the same exit is how squeezes start.",
+      path: "/home",
+      coin: m.name,
+    };
     for (const u of all) {
       if (!(u.alerts.watchlist ?? []).includes(m.name)) continue;
-      if (await claimAlert(`crowd:${u.id}:${m.name}:${bucket}`)) await deliver(u, title, body, "/home");
+      if (await claimAlert(`crowd:${u.id}:${m.name}:${bucket}`)) await deliver(u, alert);
     }
   }
 }
 
 /** 5-star events: a heads-up the day before and an hour before. */
 async function eventsLoop() {
-  const soon = await sql<{ id: number; title: string; type: EventType; starts_at: Date; stars: number | null }[]>`
-    select e.id, e.title, e.type, e.starts_at, r.stars from market_events e left join event_ratings r on r.type = e.type
+  const soon = await sql<{ id: number; title: string; detail: string | null; type: EventType; starts_at: Date; stars: number | null }[]>`
+    select e.id, e.title, e.detail, e.type, e.starts_at, r.stars from market_events e left join event_ratings r on r.type = e.type
     where e.starts_at > now() and e.starts_at < now() + interval '24 hours'`;
   if (soon.length === 0) return;
-  const all = (await users()).filter((u) => u.alerts.events !== false);
+  const all = (await usersAll()).filter((u) => u.alerts.events !== false);
   for (const e of soon) {
     const mins = (e.starts_at.getTime() - Date.now()) / 60_000;
     const stage = mins <= 60 ? "hour" : "day";
     const stars = e.stars ?? EVENT_TYPES[e.type]?.fallbackStars ?? 2;
     if (stars < 3 && stage === "day") continue;
-    const title = `${"★".repeat(stars)} ${e.title} ${stage === "hour" ? "in under an hour" : "tomorrow"}`;
-    const body = "Events like this have moved crypto hard before. Check your getaways and your size.";
+    const alert: Alert = {
+      kind: "event",
+      stars,
+      tag: stage === "hour" ? "5-STAR EVENT SOON" : "5-STAR EVENT TOMORROW",
+      headline: `${e.title}${stage === "hour" ? ` in ${Math.max(1, Math.round(mins))} min` : " tomorrow"}`,
+      lines: [...(e.detail ? [e.detail] : []), `${e.starts_at.toUTCString().replace(/:\d\d GMT$/, " UTC")}`],
+      tip: "Events like this have moved crypto hard before. Check your getaways and your size.",
+      path: "/alerts",
+    };
     for (const u of all) {
-      if (await claimAlert(`event:${u.id}:${e.id}:${stage}`)) await deliver(u, title, body, "/alerts");
+      if (await claimAlert(`event:${u.id}:${e.id}:${stage}`)) await deliver(u, alert);
     }
   }
 }
@@ -195,7 +205,7 @@ async function calendarLoop() {
 
   let blsIds: string[] | null = null;
   try {
-    const contact = process.env.CALENDAR_CONTACT_EMAIL ?? CONTACT_EMAIL;
+    const contact = process.env.CALENDAR_CONTACT_EMAIL ?? "hello@saqbot.xyz";
     const res = await fetch(BLS_ICS_URL, { headers: { "user-agent": `SaqBot calendar sync (${contact})`, accept: "text/calendar" } });
     if (!res.ok) throw new Error(`BLS calendar returned ${res.status}`);
     const bls = blsEvents(await res.text());
@@ -241,4 +251,8 @@ every(5 * 60_000, "events", eventsLoop);
 every(12 * 3_600_000, "calendar", calendarLoop);
 every(6 * 3_600_000, "ratings", ratingsLoop);
 
-bot.start({ onStart: (me) => console.log(`SaqBot worker running as @${me.username}`) });
+configureBot(bot).catch((e) => console.error("Couldn't set the bot's menu and description", e));
+bot.start({
+  allowed_updates: ["message", "callback_query"],
+  onStart: (me) => console.log(`SaqBot worker running as @${me.username}`),
+});

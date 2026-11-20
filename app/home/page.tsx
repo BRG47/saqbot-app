@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { EventList } from "../../components/EventList";
-import { Band, ModeSwitch, Stars, TabBar, Wasted, px, signedUsd, usd, useRequireSignIn } from "../../components/ui";
+import { Band, ModeSwitch, Stars, TabBar, px, signedUsd, usd, useRequireSignIn } from "../../components/ui";
 import { usePractice } from "../../lib/client/practice";
 import { useSaqbot } from "../../lib/client/saqbot";
 import { pnlAt } from "../../lib/practice";
 import { positionWantedLevel } from "../../lib/planner";
 import { REPS } from "../../lib/rep";
+import { RESTRICTED_MESSAGE } from "../../lib/client/geo";
 
 export default function Home() {
   const signedIn = useRequireSignIn();
-  const { prefs, account, markets } = useSaqbot();
+  const { prefs, account, markets, geoRestricted } = useSaqbot();
   const practice = usePractice();
   if (!signedIn) return null;
 
@@ -47,6 +48,7 @@ export default function Home() {
       <Band title="SaqBot" right={<ModeSwitch />} />
       {!live && <div className="practice-band"><span>Practice run</span><span style={{ fontWeight: 500 }}>Fake cash, real prices</span></div>}
       <main className="screen">
+        {live && geoRestricted && <p className="notice notice-warn">{RESTRICTED_MESSAGE}</p>}
         <div className="panel">
           <span className="small">{live ? "Your stash" : "Practice stash"}</span>
           <span className="display num" style={{ fontSize: 48 }}>{usd(balance)}</span>
@@ -95,7 +97,6 @@ export default function Home() {
         <Link className="btn" href="/plan">Plan a job</Link>
       </main>
       <TabBar />
-      {!live && <Wasted events={practice.lastClosed} />}
     </>
   );
 }
