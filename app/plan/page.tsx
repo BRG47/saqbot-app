@@ -3,10 +3,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { Band, ModeSwitch, Stars, TabBar, Tip, px, usd, useRequireSignIn } from "../../components/ui";
+import { Band, ModeSwitch, Stars, TabBar, Wasted, Tip, px, usd, useRequireSignIn } from "../../components/ui";
 import { usePractice } from "../../lib/client/practice";
 import { useSaqbot } from "../../lib/client/saqbot";
-import { BUILDER_FEE } from "../../lib/config";
+import { BUILDER_FEE, feeLabel } from "../../lib/config";
 import { getTodayPnl } from "../../lib/hyperliquid";
 import { placeJob } from "../../lib/orders";
 import { buildPlan, STOP_PRESETS, type Side, type StopStyle } from "../../lib/planner";
@@ -14,16 +14,14 @@ import { REPS } from "../../lib/rep";
 import { RESTRICTED_MESSAGE } from "../../lib/client/geo";
 
 const AMOUNTS = [5, 10, 25];
-const TP_PRESETS = [
-  { id: "none", label: "None", pct: 0 },
-  { id: "3", label: "+3%", pct: 0.03 },
-  { id: "6", label: "+6%", pct: 0.06 },
-] as const;
+/** Take-profit slider range, in percent from entry. 0 means no take-profit. */
+const TP_MAX_PCT = 25;
+const TP_STEP_PCT = 0.5;
 
 export default function PlanPage() {
   const signedIn = useRequireSignIn();
   const router = useRouter();
-  const { prefs, markets, account, agent, startSession, fee, refetchAccount, address, geoRestricted } = useSaqbot();
+  const { prefs, markets, account, agent, fee, refetchAccount, address, geoRestricted } = useSaqbot();
   const practice = usePractice();
   const rep = REPS[prefs.rep ?? "novice"];
   const live = prefs.mode === "live";
@@ -34,7 +32,8 @@ export default function PlanPage() {
   const [customAmount, setCustomAmount] = useState("");
   const [stopStyle, setStopStyle] = useState<StopStyle>("normal");
   const [customStop, setCustomStop] = useState("");
-  const [tp, setTp] = useState<string>("none");
+  const [tpPct, setTpPct] = useState(0);
+  const [tpExact, setTpExact] = useState(false);
   const [customTp, setCustomTp] = useState("");
   const [leverage, setLeverage] = useState(rep.suggestedLeverage);
   const [reviewing, setReviewing] = useState(false);
@@ -59,8 +58,7 @@ export default function PlanPage() {
   const plan = useMemo(() => {
     if (!market) return null;
     const dir = side === "long" ? 1 : -1;
-    const preset = TP_PRESETS.find((t) => t.id === tp);
-    const takeProfit = tp === "custom" ? Number(customTp) : preset && preset.pct ? market.markPx * (1 + dir * preset.pct) : 0;
+    const takeProfit = tpExact ? Number(customTp) : tpPct > 0 ? market.markPx * (1 + (dir * tpPct) / 100) : 0;
     const practiceValue = practice.state ? practice.state.cash : null;
     return buildPlan({
       side,
@@ -75,7 +73,7 @@ export default function PlanPage() {
       holdHours: 24,
       accountValue: live ? account?.accountValue ?? null : practiceValue,
     });
-  }, [market, side, stopStyle, customStop, tp, customTp, amt, leverage, live, account, practice.state]);
+  }, [market, side, stopStyle, customStop, tpPct, tpExact, customTp, amt, leverage, live, account, practice.state]);
 
   if (!signedIn) return null;
   if (!market || !plan) return <p className="screen">Loading markets…</p>;
@@ -170,19 +168,29 @@ export default function PlanPage() {
         </div>
 
         <div className="stack">
-          <span className="small">Take-profit (optional)</span>
-          <div className="grid4">
-            {TP_PRESETS.map((t) => (
-              <button key={t.id} type="button" className="choice" aria-pressed={tp === t.id} onClick={() => setTp(t.id)}>{t.label}</button>
-            ))}
-            {rep.customPrices ? (
-              <button type="button" className="choice" aria-pressed={tp === "custom"} onClick={() => setTp("custom")}>Exact</button>
-            ) : (
-              <span />
-            )}
-          </div>
-          {tp === "custom" && (
-            <input aria-label="Take-profit price" inputMode="decimal" value={customTp} onChange={(e) => setCustomTp(e.target.value)} style={{ font: "inherit", fontSize: 17, padding: "11px 12px", borderRadius: 10, border: "1px solid var(--line-strong)" }} />
+          {tpExact ? (
+            <>
+              <span className="row">
+                <span className="small">Take-profit price</span>
+                <button type="button" className="btn-text tiny" style={{ border: 0, background: "none", cursor: "pointer" }} onClick={() => setTpExact(false)}>Use the slider</button>
+              </span>
+              <input aria-label="Take-profit price" inputMode="decimal" value={customTp} onChange={(e) => setCustomTp(e.target.value)} style={{ font: "inherit", fontSize: 17, padding: "11px 12px", borderRadius: 10, border: "1px solid var(--line-strong)" }} />
+            </>
+          ) : (
+            <label className="field">
+              <span className="row">
+                <span>
+                  Take-profit <b style={{ color: tpPct > 0 ? "var(--up)" : "var(--ink)" }}>{tpPct > 0 ? `+${tpPct}%` : "None"}</b>
+                </span>
+                <span className="tiny">
+                  {tpPct > 0 && plan.takeProfit ? `${px(plan.takeProfit)}, about +${usd(plan.size * Math.abs(plan.takeProfit - market.markPx))}` : "Slide to set one"}
+                </span>
+              </span>
+              <input type="range" min={0} max={TP_MAX_PCT} step={TP_STEP_PCT} value={tpPct} onChange={(e) => setTpPct(Number(e.target.value))} aria-valuetext={tpPct > 0 ? `${tpPct}% from entry` : "No take-profit"} />
+              {rep.customPrices && (
+                <button type="button" className="btn-text tiny" style={{ alignSelf: "flex-start", border: 0, background: "none", padding: 0, cursor: "pointer" }} onClick={() => setTpExact(true)}>Type an exact price instead</button>
+              )}
+            </label>
           )}
         </div>
 
@@ -191,7 +199,7 @@ export default function PlanPage() {
             <span>Leverage <b style={{ color: "var(--ink)" }}>{leverage}x</b></span>
             <span className="tiny">Suggested {rep.suggestedLeverage}x, max {market.maxLeverage}x</span>
           </span>
-          <input type="range" min={1} max={market.maxLeverage} step={1} value={leverage} onChange={(e) => setLeverage(Number(e.target.value))} style={{ accentColor: "var(--ink)" }} />
+          <input type="range" min={1} max={market.maxLeverage} step={1} value={leverage} onChange={(e) => setLeverage(Number(e.target.value))} />
         </label>
 
         <div className="panel">
@@ -236,6 +244,7 @@ export default function PlanPage() {
         {error && !reviewing && <p className="notice notice-error">{error}</p>}
       </main>
       <TabBar />
+      {!live && <Wasted events={practice.lastClosed} />}
 
       {reviewing && (
         <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-label="Before the job" onClick={() => !busy && setReviewing(false)}>
@@ -256,7 +265,7 @@ export default function PlanPage() {
                 ["Take-profit", px(plan.takeProfit)],
                 ["Position value", usd(plan.notional)],
                 ["Estimated liquidation", px(plan.liqPx)],
-                ["SaqBot fee", live ? (builderFee === 0 ? "0% (BAWSAQ holder)" : `${(builderFee / 1000).toFixed(3)}%`) : "None in practice"],
+                ["SaqBot fee", live ? (builderFee === 0 ? "0% (BAWSAQ holder)" : feeLabel(builderFee)) : "None in practice"],
               ].map(([k, v]) => (
                 <div key={k} className="list-row"><span className="small">{k}</span><strong className="num">{v}</strong></div>
               ))}

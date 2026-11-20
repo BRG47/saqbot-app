@@ -7,8 +7,8 @@ import { EventList } from "../../components/EventList";
 import { Band, TabBar, ToggleRow, useRequireSignIn } from "../../components/ui";
 import { subscribePush, unsubscribePush } from "../../lib/client/push";
 import { useSaqbot } from "../../lib/client/saqbot";
+import { CONTACT_EMAIL, TELEGRAM_BOT_USERNAME } from "../../lib/config";
 import { REPS } from "../../lib/rep";
-import { TELEGRAM_BOT_USERNAME } from "../../lib/config";
 
 export default function Alerts() {
   const signedIn = useRequireSignIn();
@@ -17,6 +17,9 @@ export default function Alerts() {
   const [limit, setLimit] = useState<string>(prefs.dailyLossLimit?.toString() ?? "");
   const [tgUrl, setTgUrl] = useState<string | null>(null);
   const [tgTest, setTgTest] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const me = useQuery({
     queryKey: ["me"],
     enabled: signedIn,
@@ -63,6 +66,25 @@ export default function Alerts() {
     }
   }
 
+  async function deleteData() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await unsubscribePush().catch(() => {});
+      await api("/api/me", { method: "DELETE" });
+      endSession();
+      try {
+        for (const k of Object.keys(localStorage)) if (k.startsWith("saqbot.")) localStorage.removeItem(k);
+      } catch {
+        // storage blocked: nothing to clear
+      }
+      await logout();
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : String(e));
+      setDeleting(false);
+    }
+  }
+
   const coins = markets.slice(0, 16).map((m) => m.name);
   const toggleCoin = (c: string) =>
     updatePrefs({ alerts: { ...a, watchlist: a.watchlist.includes(c) ? a.watchlist.filter((x) => x !== c) : [...a.watchlist, c] } });
@@ -85,6 +107,7 @@ export default function Alerts() {
             checked={a.telegram}
             onChange={(on) => (on && !me.data?.telegramLinked ? linkTelegram() : updatePrefs({ alerts: { ...a, telegram: on } }))}
           />
+          {msg?.kind === "error" && <p className="notice notice-error" role="alert">{msg.text}</p>}
           {a.telegram && !me.data?.telegramLinked && (
             <div className="panel" style={{ borderColor: "var(--amber)" }}>
               <strong>One more step</strong>
@@ -128,7 +151,7 @@ export default function Alerts() {
 
         <EventList />
 
-        {msg && <p className={`notice notice-${msg.kind}`} role="status">{msg.text}</p>}
+        {msg?.kind === "ok" && <p className="notice notice-ok" role="status">{msg.text}</p>}
 
         <section className="panel">
           <h2 className="display h2">Your account</h2>
@@ -146,6 +169,26 @@ export default function Alerts() {
           <Link className="btn btn-quiet btn-sm" href="/rep">Change my rep ({prefs.rep ? REPS[prefs.rep].rank : "not set"})</Link>
           {agent && <button className="btn btn-quiet btn-sm" onClick={endSession}>End trading session on this device</button>}
           <button className="btn btn-quiet btn-sm" onClick={() => logout()}>Sign out</button>
+          {confirmDelete ? (
+            <div className="notice notice-error stack">
+              <span>
+                This permanently deletes your SaqBot account record, wallet address, alert settings, Telegram link and notification subscriptions,
+                and clears SaqBot from this device. Your funds stay in your wallet. To also delete your login and embedded wallet, email
+                {CONTACT_EMAIL} after withdrawing.
+              </span>
+              <div className="grid2">
+                <button className="btn btn-quiet btn-sm" disabled={deleting} onClick={() => setConfirmDelete(false)}>Keep my data</button>
+                <button className="btn btn-danger btn-sm" disabled={deleting} onClick={deleteData}>{deleting ? "Deleting…" : "Delete for good"}</button>
+              </div>
+              {deleteError && <span role="alert">{deleteError}</span>}
+            </div>
+          ) : (
+            <button className="btn btn-text btn-sm" style={{ color: "var(--down)" }} onClick={() => setConfirmDelete(true)}>Delete my SaqBot data</button>
+          )}
+          <nav className="footer-links" aria-label="Legal">
+            <Link href="/privacy">Privacy Policy</Link>
+            <Link href="/terms">Terms of Service</Link>
+          </nav>
         </section>
       </main>
       <TabBar />

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { EventList } from "../../components/EventList";
-import { Band, ModeSwitch, Stars, TabBar, px, signedUsd, usd, useRequireSignIn } from "../../components/ui";
+import { Band, ModeSwitch, Stars, TabBar, Wasted, px, signedUsd, usd, useRequireSignIn } from "../../components/ui";
 import { usePractice } from "../../lib/client/practice";
 import { useSaqbot } from "../../lib/client/saqbot";
 import { pnlAt } from "../../lib/practice";
@@ -97,6 +97,7 @@ export default function Home() {
         <Link className="btn" href="/plan">Plan a job</Link>
       </main>
       <TabBar />
+      {!live && <Wasted events={practice.lastClosed} />}
     </>
   );
 }

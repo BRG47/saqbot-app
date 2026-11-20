@@ -8,6 +8,7 @@ import { BLS_ICS_URL, FOMC_DECISION_DAYS, blsEvents, expiryEvents, fomcEvents, t
 import { EVENT_TYPES, starsFromMove, type EventType } from "../lib/events";
 import { getAccountState, getMarkets, getMids, info } from "../lib/hyperliquid";
 import { sql } from "../lib/server/db";
+import { CONTACT_EMAIL } from "../lib/config";
 import { claimAlert, sendPush } from "../lib/server/notify";
 import { alertMessage, configureBot, createBot, fmtPx, isMuted, usersAll, type Alert, type UserRow } from "./telegram";
 
@@ -205,7 +206,7 @@ async function calendarLoop() {
 
   let blsIds: string[] | null = null;
   try {
-    const contact = process.env.CALENDAR_CONTACT_EMAIL ?? "hello@saqbot.xyz";
+    const contact = process.env.CALENDAR_CONTACT_EMAIL ?? CONTACT_EMAIL;
     const res = await fetch(BLS_ICS_URL, { headers: { "user-agent": `SaqBot calendar sync (${contact})`, accept: "text/calendar" } });
     if (!res.ok) throw new Error(`BLS calendar returned ${res.status}`);
     const bls = blsEvents(await res.text());

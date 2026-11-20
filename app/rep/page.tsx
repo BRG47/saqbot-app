@@ -56,6 +56,16 @@ export default function RepPage() {
           ))}
         </div>
         <ToggleRow title="Telegram alerts" sub="Optional, on top of app notifications" checked={telegram} onChange={setTelegram} />
+        <div className="panel" style={{ gap: 8, marginTop: -8 }}>
+          <strong style={{ fontSize: 15 }}>Insider Info:</strong>
+          <ul className="insider">
+            <li><b>Liquidation warning:</b> your job&apos;s price is within 3% of liquidation. Sent at most once an hour per job.</li>
+            <li><b>Heat rising (near your stop):</b> price is within 1% of your stop-loss, so you know the planned exit may trigger soon.</li>
+            <li><b>Big moves:</b> a coin on your watchlist moved sharply in the last hour (2%+ for BTC and ETH, 4%+ for others) on at least twice its usual volume.</li>
+            <li><b>Crowded trades:</b> funding on a watchlist coin hits 0.01% an hour or more, meaning one side is paying heavily to stay in. Sent at most every 6 hours per coin.</li>
+            <li><b>5-star events:</b> a heads-up the day before major scheduled events rated 3 stars or higher, plus an &ldquo;under an hour&rdquo; reminder before every event.</li>
+          </ul>
+        </div>
         <button className="btn" onClick={next}>
           {rep === "novice" ? "Read the Briefing" : rep === "lookout" ? "Set up my alerts" : "Continue"}
         </button>
