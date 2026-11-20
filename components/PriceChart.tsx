@@ -2,15 +2,20 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
-import { getCandles, type CandleRange } from "../lib/hyperliquid";
+import { useTradeFlow } from "../lib/client/flow";
+import { getCandles, type Candle, type CandleRange } from "../lib/hyperliquid";
 import { px } from "./ui";
 
 type Level = { label: string; price: number | null | undefined; color: string };
 
 const W = 340;
-const H = 150;
+const H = 176;
 const PAD = { top: 10, right: 6, bottom: 18, left: 6 };
-const RANGES: CandleRange[] = ["1H", "1D", "1W"];
+/** Height of the volume bars under the price line. */
+const VOL_H = 24;
+/** Bottom edge of the price area, above the volume bars. */
+const PRICE_BOTTOM = H - PAD.bottom - VOL_H - 4;
+const RANGES: CandleRange[] = ["1H", "4H", "1D", "1W"];
 
 /**
  * Live Hyperliquid price chart for one market, with the job's entry, stop, take-profit
@@ -23,10 +28,11 @@ export function PriceChart({ coin, mark, levels }: { coin: string; mark: number;
   const candles = useQuery({
     queryKey: ["candles", coin, range],
     queryFn: () => getCandles(coin, range),
-    refetchInterval: range === "1H" ? 15_000 : 60_000,
+    refetchInterval: range === "1H" ? 15_000 : range === "4H" ? 30_000 : 60_000,
   });
 
-  const pts = [...(candles.data ?? [])];
+  const bars = candles.data ?? [];
+  const pts: Pick<Candle, "t" | "c">[] = [...bars];
   if (pts.length && mark > 0) pts.push({ t: Date.now(), c: mark });
 
   const shown = levels.filter((l): l is Level & { price: number } => Boolean(l.price && l.price > 0));
@@ -47,7 +53,9 @@ export function PriceChart({ coin, mark, levels }: { coin: string; mark: number;
   const t0 = pts[0]?.t ?? 0;
   const t1 = pts[pts.length - 1]?.t ?? 1;
   const x = (t: number) => PAD.left + ((t - t0) / (t1 - t0 || 1)) * (W - PAD.left - PAD.right);
-  const y = (p: number) => PAD.top + (1 - (p - lo) / (hi - lo)) * (H - PAD.top - PAD.bottom);
+  const y = (p: number) => PAD.top + (1 - (p - lo) / (hi - lo)) * (PRICE_BOTTOM - PAD.top);
+  const maxVol = Math.max(...bars.map((b) => b.vUsd), 0) || 1;
+  const barW = Math.max(1, ((W - PAD.left - PAD.right) / Math.max(bars.length, 1)) * 0.7);
   const line = pts.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.c).toFixed(1)}`).join("");
   const first = prices[0] ?? 0;
   const up = mark >= first;
@@ -89,21 +97,21 @@ export function PriceChart({ coin, mark, levels }: { coin: string; mark: number;
           className="chart"
           viewBox={`0 0 ${W} ${H}`}
           role="img"
-          aria-label={`${coin} price over the last ${range === "1H" ? "hour" : range === "1D" ? "day" : "week"}, now ${px(mark)}`}
+          aria-label={`${coin} price over the last ${range === "1H" ? "hour" : range === "4H" ? "4 hours" : range === "1D" ? "day" : "week"}, now ${px(mark)}`}
           onPointerMove={onMove}
           onPointerLeave={() => setHover(null)}
           style={{ touchAction: "pan-y" }}
         >
           <defs>
-            <clipPath id={clipId}><rect x={0} y={0} width={W} height={H - PAD.bottom + 2} /></clipPath>
+            <clipPath id={clipId}><rect x={0} y={0} width={W} height={PRICE_BOTTOM + 2} /></clipPath>
           </defs>
           {[0.25, 0.5, 0.75].map((f) => (
-            <line key={f} x1={PAD.left} x2={W - PAD.right} y1={PAD.top + f * (H - PAD.top - PAD.bottom)} y2={PAD.top + f * (H - PAD.top - PAD.bottom)} stroke="var(--line)" strokeWidth={1} />
+            <line key={f} x1={PAD.left} x2={W - PAD.right} y1={PAD.top + f * (PRICE_BOTTOM - PAD.top)} y2={PAD.top + f * (PRICE_BOTTOM - PAD.top)} stroke="var(--line)" strokeWidth={1} />
           ))}
           <g clipPath={`url(#${clipId})`}>
             {shown.map((l) => {
               const inside = l.price >= lo && l.price <= hi;
-              const yy = inside ? y(l.price) : l.price < lo ? H - PAD.bottom - 1 : PAD.top + 1;
+              const yy = inside ? y(l.price) : l.price < lo ? PRICE_BOTTOM - 1 : PAD.top + 1;
               return (
                 <g key={l.label}>
                   <line x1={PAD.left} x2={W - PAD.right} y1={yy} y2={yy} stroke={l.color} strokeWidth={1} strokeDasharray={inside ? "4 3" : "1 3"} opacity={0.9} />
@@ -115,6 +123,12 @@ export function PriceChart({ coin, mark, levels }: { coin: string; mark: number;
             })}
             <path d={line} fill="none" stroke="var(--neon)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
           </g>
+          {bars.map((b) => {
+            const h = Math.max(1, (b.vUsd / maxVol) * VOL_H);
+            return (
+              <rect key={b.t} x={x(b.t) - barW / 2} y={H - PAD.bottom - h} width={barW} height={h} fill={b.up ? "var(--up)" : "var(--down)"} opacity={0.45} />
+            );
+          })}
           <circle cx={x(pts[pts.length - 1].t)} cy={y(mark)} r={4} fill="var(--neon)" stroke="var(--panel-2)" strokeWidth={2} />
           {hp && (
             <>
@@ -126,8 +140,39 @@ export function PriceChart({ coin, mark, levels }: { coin: string; mark: number;
           <text x={W - PAD.right} y={H - 4} fontSize={10} fill="var(--muted)" textAnchor="end">Now</text>
         </svg>
       ) : (
-        !candles.isError && <p className="tiny" style={{ height: 120, display: "grid", placeItems: "center" }}>Loading {coin} chart…</p>
+        !candles.isError && <p className="tiny" style={{ height: 140, display: "grid", placeItems: "center" }}>Loading {coin} chart…</p>
       )}
+      <LiveFlow coin={coin} />
+    </div>
+  );
+}
+
+const compactUsd = (n: number) => "$" + n.toLocaleString("en-US", { notation: "compact", maximumFractionDigits: n >= 1000 ? 1 : 0 });
+
+/** Market buys vs market sells on Hyperliquid over the last few minutes, streamed live. */
+function LiveFlow({ coin }: { coin: string }) {
+  const { buyUsd, sellUsd, coveredMs } = useTradeFlow(coin);
+  const total = buyUsd + sellUsd;
+  const buyPct = total > 0 ? Math.round((buyUsd / total) * 100) : 50;
+  const mins = Math.max(1, Math.round(coveredMs / 60_000));
+  return (
+    <div className="flow" aria-live="off">
+      <div className="row">
+        <span className="tiny">Live flow, last {mins} min</span>
+        <span className="tiny">{total > 0 ? `${compactUsd(buyUsd)} bought • ${compactUsd(sellUsd)} sold` : "Waiting for trades…"}</span>
+      </div>
+      <div
+        className="flow-bar"
+        role="img"
+        aria-label={total > 0 ? `${buyPct}% of ${coin} volume in the last ${mins} minutes was market buys, ${100 - buyPct}% market sells` : "No trades yet"}
+      >
+        <span className="flow-buy" style={{ width: `${buyPct}%` }} />
+        <span className="flow-sell" style={{ width: `${100 - buyPct}%` }} />
+      </div>
+      <div className="row tiny">
+        <span className="up">Buyers {total > 0 ? `${buyPct}%` : "–"}</span>
+        <span className="down">{total > 0 ? `${100 - buyPct}%` : "–"} Sellers</span>
+      </div>
     </div>
   );
 }

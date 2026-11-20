@@ -58,6 +58,8 @@ export function buildCsp(nonce: string, opts: { dev: boolean; reportUri: string 
       // Hyperliquid (prices, charts, account, orders)
       "https://api.hyperliquid.xyz",
       "https://api.hyperliquid-testnet.xyz",
+      "wss://api.hyperliquid.xyz",
+      "wss://api.hyperliquid-testnet.xyz",
       // Arbitrum RPC (USDC balance, deposits) and Robinhood Chain RPC (BAWSAQ balance)
       "https://arb1.arbitrum.io",
       "https://sepolia-rollup.arbitrum.io",

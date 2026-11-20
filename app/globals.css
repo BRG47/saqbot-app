@@ -179,6 +179,12 @@ input[type="range"] { accent-color: var(--neon); width: 100%; }
 .chart { width: 100%; height: auto; display: block; }
 .chart-wrap { background: var(--panel-2); border-radius: 10px; padding: 8px 8px 4px; }
 
+/* Live buy/sell flow under the chart. */
+.flow { display: flex; flex-direction: column; gap: 4px; padding: 8px 0 4px; border-top: 1px solid var(--line); margin-top: 4px; }
+.flow-bar { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: var(--line); }
+.flow-buy { background: var(--up); transition: width 0.4s ease; }
+.flow-sell { background: var(--down); transition: width 0.4s ease; }
+
 /* Practice liquidation stamp. */
 .wasted-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(40, 0, 0, 0.72); cursor: pointer; animation: wasted-fade 0.4s ease-out; }
 .wasted-stamp {
