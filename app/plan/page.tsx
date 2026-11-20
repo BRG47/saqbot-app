@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { PriceChart } from "../../components/PriceChart";
 import { Band, ModeSwitch, Stars, TabBar, Wasted, Tip, px, usd, useRequireSignIn } from "../../components/ui";
 import { usePractice } from "../../lib/client/practice";
 import { useSaqbot } from "../../lib/client/saqbot";
@@ -118,6 +119,17 @@ export default function PlanPage() {
           </select>
         </label>
         <p className="small" style={{ marginTop: -8 }}>Enters at market, about <b className="num">{px(market.markPx)}</b></p>
+
+        <PriceChart
+          key={market.name}
+          coin={market.name}
+          mark={market.markPx}
+          levels={[
+            { label: "Stop", price: plan.stop, color: "var(--down)" },
+            { label: "TP", price: plan.takeProfit, color: "var(--neon)" },
+            { label: "Liq", price: plan.liqPx, color: "var(--amber)" },
+          ]}
+        />
 
         <div className="grid2">
           {(["long", "short"] as const).map((s) => (
